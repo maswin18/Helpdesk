@@ -41,6 +41,8 @@ def get_tickets(
     status: str = None,
     priority: str = None,
     store: str = None,
+    from_date: str = None,
+    to_date: str = None,
     limit: int = 10,
     offset: int = 0,
     order_by: str = "created_at",
@@ -59,8 +61,29 @@ def get_tickets(
     if store:
         query = query.filter(models.Ticket.store == store)
 
+    # date filtering
+    if from_date:
+        try:
+            from_dt = datetime.fromisoformat(from_date)
+            query = query.filter(models.Ticket.created_at >= from_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid from_date format. Use YYYY-MM-DD")
+
+    if to_date:
+        try:
+            to_dt = datetime.fromisoformat(to_date)
+            query = query.filter(models.Ticket.created_at <= to_dt)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid to_date format. Use YYYY-MM-DD")
+
     # sorting
-    column = getattr(models.Ticket, order_by, None)
+    allowed_fields = ["id", "created_at", "priority", "status"]
+    if order_by in allowed_fields:
+        column = getattr(models.Ticket, order_by)
+        if order_dir == "desc":
+            query = query.order_by(column.desc())
+        else:
+            query = query.order_by(column.asc())
 
     if column is not None:
         if order_dir == "desc":
@@ -72,6 +95,7 @@ def get_tickets(
     tickets = query.offset(offset).limit(limit).all()
 
     return tickets
+
 
 @app.get("/tickets/{ticket_id}", response_model=schemas.TicketResponse)
 def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
@@ -98,8 +122,7 @@ def update_ticket(
         ticket.status = ticket_update.status
 
         # if status is done → set finished_at
-        if ticket_update.status == "done":
-            from datetime import datetime
+        if ticket_update.status == "done":            
             ticket.finished_at = datetime.utcnow()
 
     if ticket_update.technician is not None:
@@ -109,7 +132,6 @@ def update_ticket(
         ticket.technician_comment = ticket_update.technician_comment
 
     # always update updated_at
-    from datetime import datetime
     ticket.updated_at = datetime.utcnow()
 
     db.commit()
