@@ -3,6 +3,7 @@ import schemas
 from fastapi import FastAPI, Depends, HTTPException
 from database import engine, Base, get_db
 from sqlalchemy.orm import Session
+from datetime import datetime
 
 app = FastAPI()
 
@@ -42,10 +43,13 @@ def get_tickets(
     store: str = None,
     limit: int = 10,
     offset: int = 0,
+    order_by: str = "created_at",
+    order_dir: str = "desc",
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Ticket)
 
+    # filtering
     if status:
         query = query.filter(models.Ticket.status == status)
 
@@ -55,7 +59,18 @@ def get_tickets(
     if store:
         query = query.filter(models.Ticket.store == store)
 
+    # sorting
+    column = getattr(models.Ticket, order_by, None)
+
+    if column is not None:
+        if order_dir == "desc":
+            query = query.order_by(column.desc())
+        else:
+            query = query.order_by(column.asc())
+
+    # pagination
     tickets = query.offset(offset).limit(limit).all()
+
     return tickets
 
 @app.get("/tickets/{ticket_id}", response_model=schemas.TicketResponse)
