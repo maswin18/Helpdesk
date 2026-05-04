@@ -36,8 +36,24 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db)):
     return db_ticket
 
 @app.get("/tickets", response_model=list[schemas.TicketResponse])
-def get_tickets(db: Session = Depends(get_db)):
-    tickets = db.query(models.Ticket).all()
+def get_tickets(
+    status: str = None,
+    priority: str = None,
+    store: str = None,
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.Ticket)
+
+    if status:
+        query = query.filter(models.Ticket.status == status)
+
+    if priority:
+        query = query.filter(models.Ticket.priority == priority)
+
+    if store:
+        query = query.filter(models.Ticket.store == store)
+
+    tickets = query.all()
     return tickets
 
 @app.get("/tickets/{ticket_id}", response_model=schemas.TicketResponse)
