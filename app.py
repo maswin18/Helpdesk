@@ -48,3 +48,38 @@ def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ticket not found")
 
     return ticket
+
+@app.put("/tickets/{ticket_id}", response_model=schemas.TicketResponse)
+def update_ticket(
+    ticket_id: int,
+    ticket_update: schemas.TicketUpdate,
+    db: Session = Depends(get_db)
+):
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # update fields if provided
+    if ticket_update.status is not None:
+        ticket.status = ticket_update.status
+
+        # if status is done → set finished_at
+        if ticket_update.status == "done":
+            from datetime import datetime
+            ticket.finished_at = datetime.utcnow()
+
+    if ticket_update.technician is not None:
+        ticket.technician = ticket_update.technician
+
+    if ticket_update.technician_comment is not None:
+        ticket.technician_comment = ticket_update.technician_comment
+
+    # always update updated_at
+    from datetime import datetime
+    ticket.updated_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(ticket)
+
+    return ticket
