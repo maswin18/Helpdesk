@@ -40,6 +40,8 @@ def get_tickets(
     status: str = None,
     priority: str = None,
     store: str = None,
+    limit: int = 10,
+    offset: int = 0,
     db: Session = Depends(get_db)
 ):
     query = db.query(models.Ticket)
@@ -53,7 +55,7 @@ def get_tickets(
     if store:
         query = query.filter(models.Ticket.store == store)
 
-    tickets = query.all()
+    tickets = query.offset(offset).limit(limit).all()
     return tickets
 
 @app.get("/tickets/{ticket_id}", response_model=schemas.TicketResponse)
