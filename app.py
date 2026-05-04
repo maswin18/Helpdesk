@@ -83,3 +83,15 @@ def update_ticket(
     db.refresh(ticket)
 
     return ticket
+
+@app.delete("/tickets/{ticket_id}")
+def delete_ticket(ticket_id: int, db: Session = Depends(get_db)):
+    ticket = db.query(models.Ticket).filter(models.Ticket.id == ticket_id).first()
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    
+    db.delete(ticket)
+    db.commit()
+
+    return {"message": "Ticket deleted successfully"}
