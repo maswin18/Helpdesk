@@ -3,6 +3,7 @@ import schemas
 from fastapi import FastAPI, Depends, HTTPException
 from database import engine, Base, get_db
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from datetime import datetime
 
 app = FastAPI()
@@ -85,12 +86,6 @@ def get_tickets(
         else:
             query = query.order_by(column.asc())
 
-    if column is not None:
-        if order_dir == "desc":
-            query = query.order_by(column.desc())
-        else:
-            query = query.order_by(column.asc())
-
     # pagination
     tickets = query.offset(offset).limit(limit).all()
 
@@ -150,3 +145,43 @@ def delete_ticket(ticket_id: int, db: Session = Depends(get_db)):
     db.commit()
 
     return {"message": "Ticket deleted successfully"}
+
+@app.get("/reports/summary")
+def get_summary(db: Session = Depends(get_db)):
+
+    # total tickets
+    total = db.query(func.count(models.Ticket.id)).scalar()
+
+    # open tickets
+    open_count = db.query(func.count(models.Ticket.id)) \
+        .filter(models.Ticket.status == "open") \
+        .scalar()
+
+    # done tickets
+    done_count = db.query(func.count(models.Ticket.id)) \
+        .filter(models.Ticket.status == "done") \
+        .scalar()
+
+    # tickets per technician
+    technician_stats = db.query(
+        models.Ticket.technician,
+        func.count(models.Ticket.id).label("total")
+    ).group_by(models.Ticket.technician).all()
+
+    # avg resolution time (in seconds)
+    avg_resolution = db.query(
+        func.avg(
+            func.strftime('%s', models.Ticket.finished_at) -
+            func.strftime('%s', models.Ticket.created_at)
+        )
+    ).filter(models.Ticket.finished_at != None).scalar()
+
+    return {
+        "total_tickets": total,
+        "open_tickets": open_count,
+        "done_tickets": done_count,
+        "tickets_per_technician": [
+            {"technician": t[0], "total": t[1]} for t in technician_stats
+        ],
+        "avg_resolution_seconds": avg_resolution
+    }
