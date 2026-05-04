@@ -34,3 +34,8 @@ def create_ticket(ticket: schemas.TicketCreate, db: Session = Depends(get_db)):
     db.refresh(db_ticket)
 
     return db_ticket
+
+@app.get("/tickets", response_model=list[schemas.TicketResponse])
+def get_tickets(db: Session = Depends(get_db)):
+    tickets = db.query(models.Ticket).all()
+    return tickets
